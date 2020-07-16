@@ -1,7 +1,18 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 #include "config.h"
 
+//Setup sensor
+// Data wire is connteced to pin 2
+#define ONE_WIRE_BUS 12
+// Setup a oneWire instance to communicate with any OneWire devices
+OneWire oneWire(ONE_WIRE_BUS);
+// Pass our oneWire reference to Dallas Temperature sensor 
+DallasTemperature DS18B20(&oneWire);
+// Define MQTT Topic 
+#define temperature_topic "sensor/temperature"
 // 0 is the special socket for all sockets
 #define ALL_SOCKETS 0
 #define BUFFER_LENGTH 100
@@ -77,11 +88,8 @@ void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    // Create a random client ID
-    String clientId = "ESP8266Client-";
-    clientId += WiFi.macAddress();
     // Attempt to connect
-    if (client.connect(clientId.c_str())) {
+    if (client.connect("EnergenieMQTT", "UserName", "Paswword")) {
       Serial.println("connected");
       String mac = WiFi.macAddress();
       mac.toCharArray(stringBuffer1, BUFFER_LENGTH);
@@ -206,6 +214,7 @@ void setup() {
   
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+  DS18B20.begin();
   
 }
 
@@ -214,4 +223,11 @@ void loop() {
     reconnect();
   }
   client.loop();
+  
+  DS18B20.requestTemperatures();
+  float temp = DS18B20.getTempCByIndex(0);
+  Serial.print("New temperature:");
+  Serial.println(String(temp).c_str());
+  client.publish(temperature_topic, String(temp).c_str(), true);
+  delay(5000); //wait 5 seconds (MilliSeconds) 
 }
